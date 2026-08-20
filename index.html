@@ -190,9 +190,12 @@
   #shape-row .glabel{font-size:11px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:0.06em;}
   .shape-opt{
     background:var(--bg-deep); border:1px solid var(--line); color:var(--ink-dim);
-    width:34px; height:34px; border-radius:8px; cursor:pointer; font-size:16px;
+    min-width:34px; height:34px; padding:0 7px; border-radius:8px; cursor:pointer; font-size:16px;
     display:flex; align-items:center; justify-content:center;
   }
+  #shape-row{max-height:150px; overflow:auto;}
+  canvas.select-mode{cursor:default;}
+  .selection-help{font-size:11px; color:var(--ink-dim); margin-left:auto;}
   .shape-opt.selected{border-color:var(--teal); color:var(--teal); background:rgba(79,209,197,0.12);}
   .fill-toggle{
     background:var(--bg-deep); border:1px solid var(--line); color:var(--ink);
@@ -544,6 +547,7 @@
 
   <div class="toolbar">
     <div class="tool-group">
+      <button class="icon-btn" id="tool-select" title="Select, move and resize objects">🖱️ Select</button>
       <button class="icon-btn tool-active" id="tool-pen" title="Pen">✏️ Pen</button>
       <button class="icon-btn" id="tool-fill" title="Paint bucket — fill an enclosed area with the selected color">🪣 Fill</button>
       <button class="icon-btn" id="tool-shape" title="Shapes">▱ Shapes</button>
@@ -560,16 +564,32 @@
     </div>
     <div class="spacer"></div>
     <button id="life-btn">✨ Bring it to life</button>
+    <span class="selection-help">Select → drag objects • corner handles → resize</span>
   </div>
 
   <div id="shape-row">
-    <span class="glabel">Shape</span>
+    <span class="glabel">20 Shapes</span>
     <button class="shape-opt selected" data-shape="rect" title="Rectangle">▭</button>
-    <button class="shape-opt" data-shape="circle" title="Circle / Ellipse">◯</button>
-    <button class="shape-opt" data-shape="line" title="Line">╱</button>
+    <button class="shape-opt" data-shape="roundRect" title="Rounded rectangle">▢</button>
+    <button class="shape-opt" data-shape="circle" title="Circle">●</button>
+    <button class="shape-opt" data-shape="ellipse" title="Ellipse">⬭</button>
     <button class="shape-opt" data-shape="triangle" title="Triangle">△</button>
-    <button class="shape-opt" data-shape="star" title="Star">★</button>
+    <button class="shape-opt" data-shape="rightTriangle" title="Right triangle">◢</button>
+    <button class="shape-opt" data-shape="diamond" title="Diamond">◆</button>
+    <button class="shape-opt" data-shape="pentagon" title="Pentagon">⬟</button>
+    <button class="shape-opt" data-shape="hexagon" title="Hexagon">⬢</button>
+    <button class="shape-opt" data-shape="octagon" title="Octagon">🛑</button>
+    <button class="shape-opt" data-shape="star" title="5-point star">★</button>
+    <button class="shape-opt" data-shape="star6" title="6-point star">✦</button>
     <button class="shape-opt" data-shape="heart" title="Heart">♥</button>
+    <button class="shape-opt" data-shape="arrow" title="Arrow">➜</button>
+    <button class="shape-opt" data-shape="cross" title="Cross">✚</button>
+    <button class="shape-opt" data-shape="plus" title="Plus">＋</button>
+    <button class="shape-opt" data-shape="cloud" title="Cloud">☁</button>
+    <button class="shape-opt" data-shape="speech" title="Speech bubble">💬</button>
+    <button class="shape-opt" data-shape="lightning" title="Lightning">⚡</button>
+    <button class="shape-opt" data-shape="moon" title="Moon">☾</button>
+    <button class="shape-opt" data-shape="line" title="Line">╱</button>
     <button class="fill-toggle on" id="shape-fill-toggle" title="Toggle filled / outline">Filled</button>
   </div>
 
@@ -1092,12 +1112,12 @@ const googleProvider = new GoogleAuthProvider();
   }
 
   /* ================================================================
-     CANVAS DRAWING
+     CANVAS DRAWING + MOVE / RESIZE OBJECTS
      ================================================================ */
 
   const canvas = $('canvas');
   const ctx = canvas.getContext('2d');
-  let activeTool = 'pen'; // 'pen' | 'eraser' | 'fill' | 'shape' | 'text'
+  let activeTool = 'pen'; // select | pen | eraser | fill | shape | text
   let drawing = false;
   let currentColor = PALETTE[7];
   let brushSize = 6;
@@ -1105,13 +1125,16 @@ const googleProvider = new GoogleAuthProvider();
   let undoStack = [];
   let dpr = 1;
 
-  // shape state
   let shapeType = 'rect';
   let shapeFilled = true;
   let shapeStart = null;
   let shapeSnapshot = null;
 
-  // text state
+  // All shapes and text are kept as editable vector-like objects.
+  // Freehand drawing remains on the raster base underneath them.
+  let objects = [];
+  let selectedObjectId = null;
+  let interaction = null;
   let textInputEl = null;
   let textAnchor = null;
 
@@ -1127,18 +1150,34 @@ const googleProvider = new GoogleAuthProvider();
   })();
 
   paperFill();
+  let baseImage = ctx.getImageData(0,0,canvas.width,canvas.height);
+
+  function cloneObjects(){
+    return JSON.parse(JSON.stringify(objects));
+  }
 
   function pushUndo(){
-    undoStack.push(ctx.getImageData(0,0,canvas.width,canvas.height));
-    if(undoStack.length > 25) undoStack.shift();
+    undoStack.push({ image: baseImage, objects: cloneObjects() });
+    if(undoStack.length > 30) undoStack.shift();
+  }
+
+  function undo(){
+    if(!undoStack.length) return;
+    const state = undoStack.pop();
+    objects = state.objects || [];
+    selectedObjectId = null;
+    baseImage = state.image;
+    ctx.putImageData(baseImage,0,0);
+    renderObjects();
   }
 
   function getPos(e){
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const touch = e.touches && e.touches.length ? e.touches[0] : null;
+    const clientX = touch ? touch.clientX : e.clientX;
+    const clientY = touch ? touch.clientY : e.clientY;
     return {
       x: (clientX - rect.left) * scaleX,
       y: (clientY - rect.top) * scaleY,
@@ -1146,22 +1185,33 @@ const googleProvider = new GoogleAuthProvider();
     };
   }
 
+  function clamp(v,min,max){ return Math.max(min,Math.min(max,v)); }
+  function normalizeRect(x0,y0,x1,y1){
+    return { x:Math.min(x0,x1), y:Math.min(y0,y1), w:Math.max(1,Math.abs(x1-x0)), h:Math.max(1,Math.abs(y1-y0)) };
+  }
+
   /* ---------------- Tool switching ---------------- */
   const toolButtons = {
-    pen: $('tool-pen'), fill: $('tool-fill'), shape: $('tool-shape'),
+    select: $('tool-select'), pen: $('tool-pen'), fill: $('tool-fill'), shape: $('tool-shape'),
     text: $('tool-text'), eraser: $('tool-eraser')
   };
 
   function setTool(tool){
     activeTool = tool;
     Object.keys(toolButtons).forEach(k=>{
-      toolButtons[k].classList.toggle('tool-active', k === tool);
+      if(toolButtons[k]) toolButtons[k].classList.toggle('tool-active', k === tool);
     });
     canvas.classList.toggle('fill-mode', tool === 'fill');
     canvas.classList.toggle('text-mode', tool === 'text');
+    canvas.classList.toggle('select-mode', tool === 'select');
     $('shape-row').style.display = (tool === 'shape') ? 'flex' : 'none';
     closeTextInput(false);
+    if(tool !== 'select'){
+      selectedObjectId = null;
+      renderObjects();
+    }
   }
+  toolButtons.select.addEventListener('click', ()=>setTool('select'));
   toolButtons.pen.addEventListener('click', ()=>setTool('pen'));
   toolButtons.fill.addEventListener('click', ()=>setTool('fill'));
   toolButtons.shape.addEventListener('click', ()=>setTool('shape'));
@@ -1183,241 +1233,316 @@ const googleProvider = new GoogleAuthProvider();
     e.currentTarget.textContent = shapeFilled ? 'Filled' : 'Outline';
   });
 
-  /* ---------------- Shape drawing helpers ---------------- */
-  function starPath(cx,cy,outerR,innerR,points){
+  /* ---------------- Vector shape helpers ---------------- */
+  function polygonPath(cx,cy,rx,ry,sides,rotation=-Math.PI/2){
+    ctx.beginPath();
+    for(let i=0;i<sides;i++){
+      const a = rotation + i*Math.PI*2/sides;
+      const x = cx + rx*Math.cos(a), y = cy + ry*Math.sin(a);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+  }
+
+  function starPath(cx,cy,outerR,innerR,points,rotation=-Math.PI/2){
     ctx.beginPath();
     for(let i=0;i<points*2;i++){
-      const r = (i % 2 === 0) ? outerR : innerR;
-      const angle = (Math.PI/points)*i - Math.PI/2;
-      const px = cx + r*Math.cos(angle);
-      const py = cy + r*Math.sin(angle);
-      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      const r = i%2===0 ? outerR : innerR;
+      const a = rotation + i*Math.PI/points;
+      const x = cx+r*Math.cos(a), y=cy+r*Math.sin(a);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
     }
     ctx.closePath();
   }
-  function heartPath(x0,y0,x1,y1){
-    const left = Math.min(x0,x1), right = Math.max(x0,x1);
-    const top = Math.min(y0,y1), bottom = Math.max(y0,y1);
-    const w = right-left, h = bottom-top, cx = left + w/2;
+
+  function heartPath(x,y,w,h){
+    const cx=x+w/2;
     ctx.beginPath();
-    ctx.moveTo(cx, top + h*0.3);
-    ctx.bezierCurveTo(cx, top, left, top, left, top + h*0.3);
-    ctx.bezierCurveTo(left, top + h*0.6, cx, top + h*0.8, cx, bottom);
-    ctx.bezierCurveTo(cx, top + h*0.8, right, top + h*0.6, right, top + h*0.3);
-    ctx.bezierCurveTo(right, top, cx, top, cx, top + h*0.3);
+    ctx.moveTo(cx, y+h);
+    ctx.bezierCurveTo(x+w*0.08,y+h*0.58, x,y+h*0.28, x+w*0.25,y+h*0.16);
+    ctx.bezierCurveTo(x+w*0.39,y+h*0.09, x+w*0.48,y+h*0.18, cx,y+h*0.32);
+    ctx.bezierCurveTo(x+w*0.52,y+h*0.18, x+w*0.61,y+h*0.09, x+w*0.75,y+h*0.16);
+    ctx.bezierCurveTo(x+w,y+h*0.28, x+w*0.92,y+h*0.58, cx,y+h);
     ctx.closePath();
   }
 
-  function drawShape(type, x0,y0,x1,y1, filled){
-    ctx.strokeStyle = currentColor;
-    ctx.fillStyle = currentColor;
-    ctx.lineWidth = Math.max(2, brushSize) * dpr;
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  function drawObject(o, includeSelection=false){
+    ctx.save();
+    ctx.strokeStyle = o.color || currentColor;
+    ctx.fillStyle = o.color || currentColor;
+    ctx.lineWidth = Math.max(1.5, o.lineWidth || brushSize*dpr);
+    ctx.lineCap='round'; ctx.lineJoin='round';
 
-    if(type === 'line'){
-      ctx.beginPath();
-      ctx.moveTo(x0,y0); ctx.lineTo(x1,y1);
-      ctx.stroke();
-      return;
+    if(o.kind === 'text'){
+      ctx.font = `${Math.max(8,o.fontSize||28)}px 'Space Grotesk', sans-serif`;
+      ctx.textBaseline='top';
+      ctx.fillText(o.text || '', o.x, o.y);
+    } else {
+      const x=o.x, y=o.y, w=o.w, h=o.h, cx=x+w/2, cy=y+h/2;
+      const fill=o.filled !== false;
+      switch(o.type){
+        case 'rect': fill ? ctx.fillRect(x,y,w,h) : ctx.strokeRect(x,y,w,h); break;
+        case 'roundRect':
+          ctx.beginPath(); ctx.roundRect(x,y,w,h,Math.min(Math.abs(w),Math.abs(h))*0.18);
+          fill ? ctx.fill() : ctx.stroke(); break;
+        case 'circle':
+          ctx.beginPath(); ctx.ellipse(cx,cy,Math.max(1,Math.abs(w)/2),Math.max(1,Math.abs(h)/2),0,0,Math.PI*2);
+          fill ? ctx.fill() : ctx.stroke(); break;
+        case 'ellipse':
+          ctx.beginPath(); ctx.ellipse(cx,cy,Math.max(1,Math.abs(w)/2),Math.max(1,Math.abs(h)/2),0,0,Math.PI*2);
+          fill ? ctx.fill() : ctx.stroke(); break;
+        case 'triangle':
+          ctx.beginPath(); ctx.moveTo(cx,y); ctx.lineTo(x,y+h); ctx.lineTo(x+w,y+h); ctx.closePath();
+          fill ? ctx.fill() : ctx.stroke(); break;
+        case 'rightTriangle':
+          ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y+h); ctx.lineTo(x+w,y+h); ctx.closePath();
+          fill ? ctx.fill() : ctx.stroke(); break;
+        case 'diamond':
+          polygonPath(cx,cy,Math.abs(w)/2,Math.abs(h)/2,4,0); fill ? ctx.fill() : ctx.stroke(); break;
+        case 'pentagon': polygonPath(cx,cy,Math.abs(w)/2,Math.abs(h)/2,5); fill ? ctx.fill() : ctx.stroke(); break;
+        case 'hexagon': polygonPath(cx,cy,Math.abs(w)/2,Math.abs(h)/2,6); fill ? ctx.fill() : ctx.stroke(); break;
+        case 'octagon': polygonPath(cx,cy,Math.abs(w)/2,Math.abs(h)/2,8,Math.PI/8); fill ? ctx.fill() : ctx.stroke(); break;
+        case 'star': starPath(cx,cy,Math.min(Math.abs(w),Math.abs(h))/2,Math.min(Math.abs(w),Math.abs(h))*0.22,5); fill ? ctx.fill() : ctx.stroke(); break;
+        case 'star6': starPath(cx,cy,Math.min(Math.abs(w),Math.abs(h))/2,Math.min(Math.abs(w),Math.abs(h))*0.48,6); fill ? ctx.fill() : ctx.stroke(); break;
+        case 'heart': heartPath(x,y,w,h); fill ? ctx.fill() : ctx.stroke(); break;
+        case 'arrow':
+          ctx.beginPath(); ctx.moveTo(x+w*0.08,cy); ctx.lineTo(x+w*0.72,cy); ctx.moveTo(x+w*0.5, y+h*0.25); ctx.lineTo(x+w*0.9,cy); ctx.lineTo(x+w*0.5,y+h*0.75); ctx.stroke(); break;
+        case 'cross':
+          ctx.beginPath(); ctx.moveTo(x+w*.38,y); ctx.lineTo(x+w*.62,y); ctx.lineTo(x+w*.62,y+h*.38); ctx.lineTo(x+w,y+h*.38); ctx.lineTo(x+w,y+h*.62); ctx.lineTo(x+w*.62,y+h*.62); ctx.lineTo(x+w*.62,y+h); ctx.lineTo(x+w*.38,y+h); ctx.lineTo(x+w*.38,y+h*.62); ctx.lineTo(x,y+h*.62); ctx.lineTo(x,y+h*.38); ctx.lineTo(x+w*.38,y+h*.38); ctx.closePath(); fill ? ctx.fill() : ctx.stroke(); break;
+        case 'plus':
+          ctx.beginPath(); ctx.moveTo(cx-w*.14,y); ctx.lineTo(cx+w*.14,y); ctx.lineTo(cx+w*.14,cy-h*.14); ctx.lineTo(x+w,cy-h*.14); ctx.lineTo(x+w,cy+h*.14); ctx.lineTo(cx+w*.14,cy+h*.14); ctx.lineTo(cx+w*.14,y+h); ctx.lineTo(cx-w*.14,y+h); ctx.lineTo(cx-w*.14,cy+h*.14); ctx.lineTo(x,cy+h*.14); ctx.lineTo(x,cy-h*.14); ctx.lineTo(cx-w*.14,cy-h*.14); ctx.closePath(); fill ? ctx.fill() : ctx.stroke(); break;
+        case 'cloud':
+          ctx.beginPath();
+          ctx.moveTo(x+w*.18,y+h*.72); ctx.bezierCurveTo(x+w*.02,y+h*.7,x+w*.02,y+h*.42,x+w*.22,y+h*.4);
+          ctx.bezierCurveTo(x+w*.2,y+h*.18,x+w*.48,y+h*.1,x+w*.58,y+h*.32);
+          ctx.bezierCurveTo(x+w*.78,y+h*.16,x+w*.98,y+h*.32,x+w*.9,y+h*.54);
+          ctx.bezierCurveTo(x+w*1.02,y+h*.7,x+w*.82,y+h*.8,x+w*.68,y+h*.72);
+          ctx.closePath(); fill ? ctx.fill() : ctx.stroke(); break;
+        case 'speech':
+          ctx.beginPath(); ctx.roundRect(x,y,w,h*.78,Math.min(w,h)*.12); ctx.moveTo(x+w*.25,y+h*.78); ctx.lineTo(x+w*.18,y+h); ctx.lineTo(x+w*.4,y+h*.78); ctx.closePath(); fill ? ctx.fill() : ctx.stroke(); break;
+        case 'lightning':
+          ctx.beginPath(); ctx.moveTo(x+w*.55,y); ctx.lineTo(x+w*.18,y+h*.52); ctx.lineTo(x+w*.46,y+h*.52); ctx.lineTo(x+w*.34,y+h); ctx.lineTo(x+w*.82,y+h*.35); ctx.lineTo(x+w*.52,y+h*.35); ctx.closePath(); fill ? ctx.fill() : ctx.stroke(); break;
+        case 'moon':
+          ctx.beginPath(); ctx.arc(cx,cy,Math.min(Math.abs(w),Math.abs(h))/2,Math.PI*.25,Math.PI*1.75);
+          ctx.arc(cx+w*.18,cy-h*.08,Math.min(Math.abs(w),Math.abs(h))/2,Math.PI*1.75,Math.PI*.25,true); ctx.closePath(); fill ? ctx.fill() : ctx.stroke(); break;
+        case 'line':
+          ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+w,y+h); ctx.stroke(); break;
+      }
     }
-    if(type === 'rect'){
-      const rw = x1-x0, rh = y1-y0;
-      if(filled) ctx.fillRect(x0,y0,rw,rh); else ctx.strokeRect(x0,y0,rw,rh);
-      return;
+    ctx.restore();
+
+    if(includeSelection && selectedObjectId === o.id) drawSelection(o);
+  }
+
+  function drawSelection(o){
+    const b = getObjectBounds(o);
+    ctx.save();
+    ctx.strokeStyle = '#4FD1C5';
+    ctx.lineWidth = 2*dpr;
+    ctx.setLineDash([6*dpr,4*dpr]);
+    ctx.strokeRect(b.x-5*dpr,b.y-5*dpr,b.w+10*dpr,b.h+10*dpr);
+    ctx.setLineDash([]);
+    const hs = 7*dpr;
+    const handles=[
+      [b.x-5*dpr,b.y-5*dpr],[b.x+b.w+5*dpr,b.y-5*dpr],
+      [b.x-5*dpr,b.y+b.h+5*dpr],[b.x+b.w+5*dpr,b.y+b.h+5*dpr]
+    ];
+    ctx.fillStyle='#FBF6EA';
+    ctx.strokeStyle='#16211F';
+    handles.forEach(([x,y])=>{ctx.beginPath();ctx.rect(x-hs/2,y-hs/2,hs,hs);ctx.fill();ctx.stroke();});
+    ctx.fillStyle='#4FD1C5';
+    ctx.font=`${11*dpr}px 'Space Grotesk',sans-serif`;
+    ctx.fillText('drag to move • corners to resize', b.x, Math.max(13*dpr,b.y-14*dpr));
+    ctx.restore();
+  }
+
+  function getObjectBounds(o){
+    if(o.kind==='text'){
+      ctx.save(); ctx.font=`${Math.max(8,o.fontSize||28)}px 'Space Grotesk', sans-serif`;
+      const m=ctx.measureText(o.text||''); ctx.restore();
+      return {x:o.x,y:o.y,w:Math.max(8,m.width),h:Math.max(10,(o.fontSize||28)*1.15)};
     }
-    if(type === 'circle'){
-      const cx=(x0+x1)/2, cy=(y0+y1)/2, rx=Math.abs(x1-x0)/2, ry=Math.abs(y1-y0)/2;
-      ctx.beginPath();
-      ctx.ellipse(cx,cy,Math.max(rx,1),Math.max(ry,1),0,0,Math.PI*2);
-      filled ? ctx.fill() : ctx.stroke();
-      return;
+    return {x:Math.min(o.x,o.x+o.w),y:Math.min(o.y,o.y+o.h),w:Math.abs(o.w),h:Math.abs(o.h)};
+  }
+
+  function renderObjects(showSelection=true){
+    ctx.putImageData(baseImage,0,0);
+    objects.forEach(o=>drawObject(o,showSelection));
+  }
+
+  function captureBase(){
+    baseImage = ctx.getImageData(0,0,canvas.width,canvas.height);
+  }
+
+  function renderBaseOnly(){ ctx.putImageData(baseImage,0,0); }
+
+  function objectAt(x,y){
+    for(let i=objects.length-1;i>=0;i--){
+      const o=objects[i], b=getObjectBounds(o), pad=8*dpr;
+      if(x>=b.x-pad && x<=b.x+b.w+pad && y>=b.y-pad && y<=b.y+b.h+pad) return o;
     }
-    if(type === 'triangle'){
-      ctx.beginPath();
-      ctx.moveTo((x0+x1)/2, y0);
-      ctx.lineTo(x0,y1);
-      ctx.lineTo(x1,y1);
-      ctx.closePath();
-      filled ? ctx.fill() : ctx.stroke();
-      return;
-    }
-    if(type === 'star'){
-      const cx=(x0+x1)/2, cy=(y0+y1)/2;
-      const outerR = Math.max(Math.min(Math.abs(x1-x0),Math.abs(y1-y0))/2, 4);
-      starPath(cx,cy,outerR,outerR*0.45,5);
-      filled ? ctx.fill() : ctx.stroke();
-      return;
-    }
-    if(type === 'heart'){
-      heartPath(x0,y0,x1,y1);
-      filled ? ctx.fill() : ctx.stroke();
-      return;
-    }
+    return null;
+  }
+
+  function handleAt(o,x,y){
+    if(!o) return null;
+    const b=getObjectBounds(o), r=10*dpr;
+    const pts={nw:[b.x,b.y],ne:[b.x+b.w,b.y],sw:[b.x,b.y+b.h],se:[b.x+b.w,b.y+b.h]};
+    for(const k of Object.keys(pts)) if(Math.hypot(x-pts[k][0],y-pts[k][1])<=r) return k;
+    return null;
   }
 
   /* ---------------- Paint bucket / flood fill ---------------- */
   function hexToRgb(hex){
-    hex = hex.replace('#','');
-    if(hex.length === 3){ hex = hex.split('').map(c=>c+c).join(''); }
-    const num = parseInt(hex,16);
-    return { r:(num>>16)&255, g:(num>>8)&255, b:num&255 };
+    hex=hex.replace('#',''); if(hex.length===3) hex=hex.split('').map(c=>c+c).join('');
+    const num=parseInt(hex,16); return {r:(num>>16)&255,g:(num>>8)&255,b:num&255};
   }
-  function colorsClose(r1,g1,b1,r2,g2,b2,tol){
-    return Math.abs(r1-r2)<=tol && Math.abs(g1-g2)<=tol && Math.abs(b1-b2)<=tol;
-  }
-  function floodFill(xf, yf){
-    const w = canvas.width, h = canvas.height;
-    const startX = Math.floor(xf), startY = Math.floor(yf);
-    if(startX<0 || startY<0 || startX>=w || startY>=h) return;
-
+  function colorsClose(r1,g1,b1,r2,g2,b2,tol){return Math.abs(r1-r2)<=tol&&Math.abs(g1-g2)<=tol&&Math.abs(b1-b2)<=tol;}
+  function floodFill(xf,yf){
+    renderBaseOnly();
+    const w=canvas.width,h=canvas.height,startX=Math.floor(xf),startY=Math.floor(yf);
+    if(startX<0||startY<0||startX>=w||startY>=h)return;
+    const imgData=ctx.getImageData(0,0,w,h),data=imgData.data;
+    const si=(startY*w+startX)*4;
+    const targetR=data[si],targetG=data[si+1],targetB=data[si+2],fc=hexToRgb(currentColor);
+    if(colorsClose(targetR,targetG,targetB,fc.r,fc.g,fc.b,10)){renderObjects();return;}
     pushUndo();
-    const imgData = ctx.getImageData(0,0,w,h);
-    const data = imgData.data;
-
-    const startIdx = (startY*w+startX)*4;
-    const targetR = data[startIdx], targetG = data[startIdx+1], targetB = data[startIdx+2];
-    const fc = hexToRgb(currentColor);
-
-    if(colorsClose(targetR,targetG,targetB,fc.r,fc.g,fc.b,10)) return;
-
-    const tolerance = 45;
-    const visited = new Uint8Array(w*h);
-    const stack = [startY*w+startX];
-
+    const visited=new Uint8Array(w*h),stack=[startY*w+startX],tol=45;
     while(stack.length){
-      const p = stack.pop();
-      if(visited[p]) continue;
-
-      const px = p % w;
-      const py = (p - px) / w;
-      const di = p * 4;
-      const r = data[di], g = data[di+1], b = data[di+2];
-
-      if(!colorsClose(r,g,b,targetR,targetG,targetB,tolerance)) continue;
-
-      visited[p] = 1;
-      data[di] = fc.r; data[di+1] = fc.g; data[di+2] = fc.b; data[di+3] = 255;
-
-      if(px+1 < w && !visited[p+1]) stack.push(p+1);
-      if(px-1 >= 0 && !visited[p-1]) stack.push(p-1);
-      if(py+1 < h && !visited[p+w]) stack.push(p+w);
-      if(py-1 >= 0 && !visited[p-w]) stack.push(p-w);
+      const p=stack.pop(); if(visited[p])continue;
+      const px=p%w,py=(p-px)/w,di=p*4,r=data[di],g=data[di+1],b=data[di+2];
+      if(!colorsClose(r,g,b,targetR,targetG,targetB,tol))continue;
+      visited[p]=1;data[di]=fc.r;data[di+1]=fc.g;data[di+2]=fc.b;data[di+3]=255;
+      if(px+1<w&&!visited[p+1])stack.push(p+1); if(px>0&&!visited[p-1])stack.push(p-1);
+      if(py+1<h&&!visited[p+w])stack.push(p+w); if(py>0&&!visited[p-w])stack.push(p-w);
     }
-
-    ctx.putImageData(imgData,0,0);
+    ctx.putImageData(imgData,0,0); captureBase(); renderObjects();
   }
 
   /* ---------------- Text tool ---------------- */
   function closeTextInput(commit){
-    if(!textInputEl) return;
-    const val = textInputEl.value;
-    const anchor = textAnchor;
-    textInputEl.remove();
-    textInputEl = null;
-    textAnchor = null;
-
-    if(commit && val && val.trim().length){
+    if(!textInputEl)return;
+    const val=textInputEl.value.trim(),anchor=textAnchor;
+    textInputEl.remove(); textInputEl=null;textAnchor=null;
+    if(commit&&val){
       pushUndo();
-      const sizePx = Math.max(16, brushSize*3) * dpr;
-      ctx.fillStyle = currentColor;
-      ctx.font = sizePx + "px 'Space Grotesk', sans-serif";
-      ctx.textBaseline = 'top';
-      ctx.fillText(val, anchor.x, anchor.y);
+      const minX=12*dpr,maxX=canvas.width-160*dpr,minY=12*dpr,maxY=canvas.height-50*dpr;
+      // Text starts at a random safe location, then can be moved/resized with Select.
+      const jitterX=(Math.random()-0.5)*70*dpr, jitterY=(Math.random()-0.5)*50*dpr;
+      const x=clamp(anchor.x+jitterX,minX,maxX),y=clamp(anchor.y+jitterY,minY,maxY);
+      const o={id:'o_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),kind:'text',text:val,x,y,color:currentColor,fontSize:Math.max(18,brushSize*4)*dpr,lineWidth:brushSize*dpr};
+      objects.push(o);selectedObjectId=o.id;renderObjects();setTool('select');toast('Text added — drag it or resize from the corners');
     }
   }
   function openTextInput(p){
-    closeTextInput(true);
-    textAnchor = { x:p.x, y:p.y };
-
-    const inp = document.createElement('input');
-    inp.type = 'text';
-    inp.className = 'canvas-text-input';
-    inp.style.left = p.clientX + 'px';
-    inp.style.top = (p.clientY - 14) + 'px';
-    inp.style.color = currentColor;
-    document.body.appendChild(inp);
-    textInputEl = inp;
-    inp.focus();
-
-    inp.addEventListener('keydown',(e)=>{
-      if(e.key === 'Enter'){ e.preventDefault(); closeTextInput(true); }
-      if(e.key === 'Escape'){ e.preventDefault(); closeTextInput(false); }
-    });
-    inp.addEventListener('blur', ()=>{ closeTextInput(true); });
+    closeTextInput(true);textAnchor={x:p.x,y:p.y};
+    const inp=document.createElement('input');inp.type='text';inp.className='canvas-text-input';
+    inp.style.left=p.clientX+'px';inp.style.top=(p.clientY-14)+'px';inp.style.color=currentColor;
+    document.body.appendChild(inp);textInputEl=inp;inp.focus();
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();closeTextInput(true);}if(e.key==='Escape'){e.preventDefault();closeTextInput(false);}});
+    inp.addEventListener('blur',()=>closeTextInput(true));
   }
 
   /* ---------------- Pointer handlers ---------------- */
   function startDraw(e){
-    e.preventDefault();
-    const p = getPos(e);
+    e.preventDefault();const p=getPos(e);
+    if(activeTool==='fill'){floodFill(p.x,p.y);return;}
+    if(activeTool==='text'){openTextInput(p);return;}
 
-    if(activeTool === 'fill'){ floodFill(p.x, p.y); return; }
-    if(activeTool === 'text'){ openTextInput(p); return; }
-
-    if(activeTool === 'shape'){
-      pushUndo();
-      shapeSnapshot = ctx.getImageData(0,0,canvas.width,canvas.height);
-      shapeStart = { x:p.x, y:p.y };
-      drawing = true;
-      return;
+    if(activeTool==='select'){
+      const current=objects.find(o=>o.id===selectedObjectId);
+      const resizeHandle=handleAt(current,p.x,p.y);
+      if(resizeHandle){
+        pushUndo();interaction={mode:'resize',handle:resizeHandle,startX:p.x,startY:p.y,original:JSON.parse(JSON.stringify(current))};return;
+      }
+      const hit=objectAt(p.x,p.y);
+      if(hit){
+        pushUndo();selectedObjectId=hit.id;interaction={mode:'move',startX:p.x,startY:p.y,original:JSON.parse(JSON.stringify(hit))};
+        // bring selected object to front
+        objects=objects.filter(o=>o.id!==hit.id);objects.push(hit);renderObjects();return;
+      }
+      selectedObjectId=null;renderObjects();return;
     }
 
-    // pen / eraser
-    drawing = true;
-    pushUndo();
-    lastX = p.x; lastY = p.y;
-    dot(p.x,p.y);
+    if(activeTool==='shape'){
+      pushUndo();renderBaseOnly();shapeSnapshot=ctx.getImageData(0,0,canvas.width,canvas.height);shapeStart={x:p.x,y:p.y};drawing=true;return;
+    }
+
+    // Pen / eraser draw on the raster base underneath editable objects.
+    pushUndo();renderBaseOnly();drawing=true;lastX=p.x;lastY=p.y;dot(p.x,p.y);
   }
 
   function moveDraw(e){
-    if(!drawing) return;
-    e.preventDefault();
-    const p = getPos(e);
-
-    if(activeTool === 'shape' && shapeSnapshot && shapeStart){
-      ctx.putImageData(shapeSnapshot,0,0);
-      drawShape(shapeType, shapeStart.x, shapeStart.y, p.x, p.y, shapeFilled);
-      return;
+    if(activeTool==='select' && interaction){
+      e.preventDefault();const p=getPos(e),o=objects.find(v=>v.id===selectedObjectId);if(!o)return;
+      const dx=p.x-interaction.startX,dy=p.y-interaction.startY,orig=interaction.original;
+      if(interaction.mode==='move'){
+        o.x=orig.x+dx;o.y=orig.y+dy;
+      } else {
+        const h=interaction.handle;
+        let b={x:orig.x,y:orig.y,w:orig.w,h:orig.h};
+        if(orig.kind==='text'){
+          // Resize text by scaling font size and keeping its anchor responsive.
+          const ow=Math.max(8,getObjectBounds(orig).w),oh=Math.max(10,getObjectBounds(orig).h);
+          if(h==='se') o.fontSize=Math.max(10,orig.fontSize + (dx+dy)*0.35);
+          if(h==='sw') o.fontSize=Math.max(10,orig.fontSize + (-dx+dy)*0.35);
+          if(h==='ne') o.fontSize=Math.max(10,orig.fontSize + (dx-dy)*0.35);
+          if(h==='nw') o.fontSize=Math.max(10,orig.fontSize + (-dx-dy)*0.35);
+          if(h==='nw'||h==='sw') o.x=orig.x+dx;
+          if(h==='nw'||h==='ne') o.y=orig.y+dy;
+        } else {
+          const right=orig.x+orig.w,bottom=orig.y+orig.h;
+          if(h==='se'){b.w=Math.max(10,orig.w+dx);b.h=Math.max(10,orig.h+dy);}
+          if(h==='sw'){b.x=orig.x+dx;b.w=Math.max(10,orig.w-dx);b.h=Math.max(10,orig.h+dy);}
+          if(h==='ne'){b.y=orig.y+dy;b.w=Math.max(10,orig.w+dx);b.h=Math.max(10,orig.h-dy);}
+          if(h==='nw'){b.x=orig.x+dx;b.y=orig.y+dy;b.w=Math.max(10,orig.w-dx);b.h=Math.max(10,orig.h-dy);}
+          o.x=b.x;o.y=b.y;o.w=b.w;o.h=b.h;
+        }
+      }
+      o.x=clamp(o.x,0,canvas.width-10);o.y=clamp(o.y,0,canvas.height-10);renderObjects();return;
     }
 
-    ctx.strokeStyle = (activeTool === 'eraser') ? '#FBF6EA' : currentColor;
-    ctx.lineWidth = (activeTool === 'eraser' ? brushSize * 2.2 : brushSize) * dpr;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(lastX,lastY);
-    ctx.lineTo(p.x,p.y);
-    ctx.stroke();
-
-    lastX = p.x;
-    lastY = p.y;
+    if(!drawing)return;e.preventDefault();const p=getPos(e);
+    if(activeTool==='shape'&&shapeSnapshot&&shapeStart){
+      ctx.putImageData(shapeSnapshot,0,0);
+      const r=normalizeRect(shapeStart.x,shapeStart.y,p.x,p.y);
+      const preview={id:'preview',kind:'shape',type:shapeType,x:r.x,y:r.y,w:r.w,h:r.h,color:currentColor,filled:shapeFilled,lineWidth:Math.max(2,brushSize)*dpr};
+      drawObject(preview,false);return;
+    }
+    ctx.strokeStyle=(activeTool==='eraser')?'#FBF6EA':currentColor;
+    ctx.lineWidth=(activeTool==='eraser'?brushSize*2.2:brushSize)*dpr;ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.beginPath();ctx.moveTo(lastX,lastY);ctx.lineTo(p.x,p.y);ctx.stroke();lastX=p.x;lastY=p.y;
   }
 
   function dot(x,y){
-    ctx.fillStyle = (activeTool === 'eraser') ? '#FBF6EA' : currentColor;
-    ctx.beginPath();
-    ctx.arc(
-      x, y,
-      ((activeTool === 'eraser' ? brushSize*2.2 : brushSize) * dpr)/2,
-      0, Math.PI*2
-    );
-    ctx.fill();
+    ctx.fillStyle=(activeTool==='eraser')?'#FBF6EA':currentColor;ctx.beginPath();ctx.arc(x,y,((activeTool==='eraser'?brushSize*2.2:brushSize)*dpr)/2,0,Math.PI*2);ctx.fill();
   }
 
-  function endDraw(){
-    drawing = false;
-    shapeStart = null;
-    shapeSnapshot = null;
+  function endDraw(e){
+    if(activeTool==='select'&&interaction){interaction=null;return;}
+    if(!drawing)return;drawing=false;
+    if(activeTool==='shape'&&shapeStart){
+      const p=e&&e.changedTouches&&e.changedTouches.length?getPos(e):lastPointer || shapeStart;
+      const r=normalizeRect(shapeStart.x,shapeStart.y,p.x,p.y);
+      if(r.w>5&&r.h>5){
+        objects.push({id:'o_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),kind:'shape',type:shapeType,x:r.x,y:r.y,w:r.w,h:r.h,color:currentColor,filled:shapeFilled,lineWidth:Math.max(2,brushSize)*dpr});
+      }
+      shapeStart=null;shapeSnapshot=null;renderObjects();return;
+    }
+    captureBase();renderObjects();
   }
 
-  canvas.addEventListener('mousedown', startDraw);
-  canvas.addEventListener('mousemove', moveDraw);
-  window.addEventListener('mouseup', endDraw);
-  canvas.addEventListener('touchstart', startDraw, {passive:false});
-  canvas.addEventListener('touchmove', moveDraw, {passive:false});
-  canvas.addEventListener('touchend', endDraw);
+  let lastPointer=null;
+  function trackPointer(e){try{lastPointer=getPos(e);}catch(_){} }
+  canvas.addEventListener('mousedown',e=>{trackPointer(e);startDraw(e);});
+  canvas.addEventListener('mousemove',e=>{trackPointer(e);moveDraw(e);});
+  window.addEventListener('mouseup',e=>{if(lastPointer) endDraw(e);});
+  canvas.addEventListener('touchstart',e=>{trackPointer(e);startDraw(e);},{passive:false});
+  canvas.addEventListener('touchmove',e=>{trackPointer(e);moveDraw(e);},{passive:false});
+  canvas.addEventListener('touchend',e=>{endDraw(e);},{passive:false});
 
   /* ---------------- Color palette ---------------- */
+
   const colorDotsWrap = $('color-dots');
   const currentSwatchEl = $('current-swatch');
   const customColorInput = $('custom-color');
@@ -1454,14 +1579,15 @@ const googleProvider = new GoogleAuthProvider();
     brushSize = parseInt(e.target.value,10);
   });
 
-  $('undo-btn').addEventListener('click', ()=>{
-    if(undoStack.length === 0) return;
-    ctx.putImageData(undoStack.pop(),0,0);
-  });
+  $('undo-btn').addEventListener('click', undo);
 
   $('clear-btn').addEventListener('click', ()=>{
     pushUndo();
+    objects = [];
+    selectedObjectId = null;
     paperFill();
+    captureBase();
+    renderObjects();
   });
 
   /* ================================================================
@@ -1495,6 +1621,9 @@ const googleProvider = new GoogleAuthProvider();
   });
 
   $('life-btn').addEventListener('click', ()=>{
+    closeTextInput(true);
+    selectedObjectId = null;
+    renderObjects(false);
     $('doodle-title').value = '';
     chosenObjectType = null;
     [...objectGrid.children].forEach(o=>o.classList.remove('selected'));
@@ -1525,7 +1654,12 @@ const googleProvider = new GoogleAuthProvider();
     }
 
     const title = $('doodle-title').value.trim() || 'Untitled doodle';
+    const previousSelection = selectedObjectId;
+    selectedObjectId = null;
+    renderObjects(false);
     const dataUrl = canvas.toDataURL('image/jpeg',0.88);
+    selectedObjectId = previousSelection;
+    renderObjects();
 
     const entry = {
       id: 'd_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
