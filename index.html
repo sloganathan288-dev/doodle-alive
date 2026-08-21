@@ -174,6 +174,9 @@
   }
   .icon-btn:hover{border-color:var(--teal); color:var(--teal);}
   .icon-btn.tool-active{border-color:var(--teal); color:var(--teal); background:rgba(79,209,197,0.12);}
+  .font-control{display:flex;align-items:center;gap:6px;background:var(--bg-deep);border:1px solid var(--line);border-radius:8px;padding:6px 8px;color:var(--ink-dim);font-size:12px;}
+  .font-control select{background:transparent;border:none;color:var(--ink);font:inherit;min-width:145px;outline:none;cursor:pointer;}
+  .font-control option{background:#1F2E2B;color:#EDEADF;}
   .spacer{flex:1;}
   #life-btn{
     background:linear-gradient(135deg, var(--coral), var(--yellow)); border:none; color:#211405;
@@ -557,6 +560,23 @@
       <button class="icon-btn" id="tool-fill" title="Paint bucket — fill an enclosed area with the selected color">🪣 Fill</button>
       <button class="icon-btn" id="tool-shape" title="Shapes">▱ Shapes</button>
       <button class="icon-btn" id="tool-text" title="Add text">🔤 Text</button>
+      <label class="font-control" title="Text font">Aa
+        <select id="text-font">
+          <option value="Space Grotesk">Space Grotesk</option>
+          <option value="Arial">Arial</option>
+          <option value="Verdana">Verdana</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Times New Roman">Times New Roman</option>
+          <option value="Trebuchet MS">Trebuchet MS</option>
+          <option value="Courier New">Courier New</option>
+          <option value="Impact">Impact</option>
+          <option value="Comic Sans MS">Comic Sans MS</option>
+          <option value="Caveat">Caveat</option>
+          <option value="monospace">Monospace</option>
+          <option value="serif">Serif</option>
+          <option value="sans-serif">Sans Serif</option>
+        </select>
+      </label>
       <button class="icon-btn" id="tool-eraser" title="Eraser">🧽 Eraser</button>
     </div>
     <div class="tool-group">
@@ -566,6 +586,7 @@
     <div class="tool-group">
       <button class="icon-btn" id="undo-btn">↺ Undo</button>
       <button class="icon-btn" id="clear-btn">🗑 Clear</button>
+      <button class="icon-btn" id="export-btn" title="Download your drawing as PNG">⬇️ PNG</button>
     </div>
     <div class="spacer"></div>
     <button id="life-btn">✨ Bring it to life</button>
@@ -1170,6 +1191,7 @@ const googleProvider = new GoogleAuthProvider();
   const canvas = $('canvas');
   const ctx = canvas.getContext('2d');
   let activeTool = 'pen'; // select | pen | eraser | fill | shape | text
+  let currentFont = 'Space Grotesk';
   let drawing = false;
   let currentColor = PALETTE[7];
   let brushSize = 6;
@@ -1364,9 +1386,10 @@ const googleProvider = new GoogleAuthProvider();
     ctx.save();ctx.strokeStyle=o.color||currentColor;ctx.fillStyle=o.color||currentColor;
     ctx.lineWidth=Math.max(1.5,o.lineWidth||brushSize*dpr);ctx.lineCap='round';ctx.lineJoin='round';
     if(o.kind==='text'){
-      ctx.font=`${Math.max(8,o.fontSize||28)}px 'Space Grotesk',sans-serif`;ctx.textBaseline='top';ctx.fillText(o.text||'',o.x,o.y);
+      ctx.font=`${Math.max(8,o.fontSize||28)}px '${(o.fontFamily||'Space Grotesk').replace(/'/g, '')}',sans-serif`;ctx.textBaseline='top';ctx.fillStyle=o.color||currentColor;ctx.fillText(o.text||'',o.x,o.y);
     }else{
       const x=o.x,y=o.y,w=o.w,h=o.h,cx=x+w/2,cy=y+h/2,rx=Math.abs(w)/2,ry=Math.abs(h)/2,fill=o.filled!==false;
+      ctx.beginPath();
       switch(o.type){
         case 'rect': fill?ctx.fillRect(x,y,w,h):ctx.strokeRect(x,y,w,h);break;
         case 'roundRect':ctx.beginPath();ctx.roundRect(x,y,w,h,Math.min(Math.abs(w),Math.abs(h))*.18);fill?ctx.fill():ctx.stroke();break;
@@ -1433,7 +1456,12 @@ const googleProvider = new GoogleAuthProvider();
         case 'pin':pinPath(x,y,w,h);fill?ctx.fill():ctx.stroke();break;
         case 'ring':ctx.beginPath();ctx.arc(cx,cy,Math.min(rx,ry)*.72,0,Math.PI*2);ctx.stroke();break;
         case 'semicircle':ctx.beginPath();ctx.arc(cx,cy,Math.min(rx,ry),Math.PI,0);ctx.closePath();fill?ctx.fill():ctx.stroke();break;
-        case 'line':ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+w,y+h);ctx.stroke();break;
+        case 'line':ctx.moveTo(x,y);ctx.lineTo(x+w,y+h);ctx.stroke();break;
+        default:
+          // Never leave an unknown shape invisible. Draw a safe rounded rectangle fallback.
+          ctx.roundRect(x,y,w,h,Math.min(Math.abs(w),Math.abs(h))*.18);
+          fill?ctx.fill():ctx.stroke();
+          break;
       }
     }
     ctx.restore();
@@ -1454,7 +1482,7 @@ const googleProvider = new GoogleAuthProvider();
 
   function getObjectBounds(o){
     if(o.kind==='text'){
-      ctx.save(); ctx.font=`${Math.max(8,o.fontSize||28)}px 'Space Grotesk', sans-serif`;
+      ctx.save(); ctx.font=`${Math.max(8,o.fontSize||28)}px '${(o.fontFamily||'Space Grotesk').replace(/'/g, '')}', sans-serif`;
       const m=ctx.measureText(o.text||''); ctx.restore();
       return {x:o.x,y:o.y,w:Math.max(8,m.width),h:Math.max(10,(o.fontSize||28)*1.15)};
     }
@@ -1526,7 +1554,7 @@ const googleProvider = new GoogleAuthProvider();
       // Text starts at a random safe location, then can be moved/resized with Select.
       const jitterX=(Math.random()-0.5)*36*dpr, jitterY=(Math.random()-0.5)*28*dpr;
       const x=clamp(anchor.x+jitterX,minX,maxX),y=clamp(anchor.y+jitterY,minY,maxY);
-      const o={id:'o_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),kind:'text',text:val,x,y,color:currentColor,fontSize:Math.max(18,brushSize*4)*dpr,lineWidth:brushSize*dpr};
+      const o={id:'o_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),kind:'text',text:val,x,y,color:currentColor,fontSize:Math.max(18,brushSize*4)*dpr,lineWidth:brushSize*dpr,fontFamily:currentFont,fontFamily:currentFont};
       objects.push(o);selectedObjectId=o.id;renderObjects();setTool('select');toast('Text added — drag it or resize from the corners');
     }
   }
@@ -1540,6 +1568,8 @@ const googleProvider = new GoogleAuthProvider();
     inp.style.setProperty('background',luminance>0.62?'#16211F':'#fffdf5','important');
     inp.style.setProperty('color',currentColor,'important');
     inp.style.setProperty('caret-color',luminance>0.62?'#fff':'#16211F','important');
+    inp.style.fontFamily=currentFont;
+    inp.style.fontSize=Math.max(16,brushSize*3.2)+'px';
     document.body.appendChild(inp);textInputEl=inp;inp.focus();
     inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();closeTextInput(true);}if(e.key==='Escape'){e.preventDefault();closeTextInput(false);}});
     inp.addEventListener('blur',()=>closeTextInput(true));
@@ -1560,6 +1590,10 @@ const googleProvider = new GoogleAuthProvider();
       const hit=objectAt(p.x,p.y);
       if(hit){
         pushUndo();selectedObjectId=hit.id;interaction={mode:'move',startX:p.x,startY:p.y,original:JSON.parse(JSON.stringify(hit))};
+        if(hit.kind==='text'){
+          currentFont=hit.fontFamily||'Space Grotesk';
+          $('text-font').value=currentFont;
+        }
         // bring selected object to front
         objects=objects.filter(o=>o.id!==hit.id);objects.push(hit);renderObjects();return;
       }
@@ -1583,8 +1617,16 @@ const googleProvider = new GoogleAuthProvider();
       } else {
         const h=interaction.handle,origB=getObjectBounds(orig);
         if(orig.kind==='text'){
-          const amount={se:1,sw:1,ne:1,nw:1,e:.8,w:.8,n:-.8,s:.8}[h]||1;
-          o.fontSize=Math.max(10,orig.fontSize+(dx+dy)*.28*amount);
+          const origB=getObjectBounds(orig);
+          let scale=1;
+          if(['e','w'].includes(h)) scale=(origB.w+(h==='e'?dx:-dx))/Math.max(1,origB.w);
+          else if(['n','s'].includes(h)) scale=(origB.h+(h==='s'?dy:-dy))/Math.max(1,origB.h);
+          else {
+            const sx=(origB.w+(h.includes('e')?dx:-dx))/Math.max(1,origB.w);
+            const sy=(origB.h+(h.includes('s')?dy:-dy))/Math.max(1,origB.h);
+            scale=Math.max(0.25,(sx+sy)/2);
+          }
+          o.fontSize=Math.max(10,orig.fontSize*scale);
           if(h==='nw'||h==='w'||h==='sw')o.x=orig.x+dx;
           if(h==='nw'||h==='n'||h==='ne')o.y=orig.y+dy;
         }else{
@@ -1698,6 +1740,16 @@ const googleProvider = new GoogleAuthProvider();
     brushSize = parseInt(e.target.value,10);
   });
 
+  $('text-font').addEventListener('change', (e)=>{
+    currentFont = e.target.value;
+    const o = objects.find(v=>v.id===selectedObjectId);
+    if(o && o.kind==='text' && activeTool==='select'){
+      pushUndo();
+      o.fontFamily = currentFont;
+      renderObjects();
+    }
+  });
+
   $('undo-btn').addEventListener('click', undo);
 
   $('clear-btn').addEventListener('click', ()=>{
@@ -1707,6 +1759,20 @@ const googleProvider = new GoogleAuthProvider();
     paperFill();
     captureBase();
     renderObjects();
+  });
+
+  $('export-btn').addEventListener('click', ()=>{
+    closeTextInput(true);
+    const previous=selectedObjectId;
+    selectedObjectId=null;
+    renderObjects(false);
+    const a=document.createElement('a');
+    a.download='doodle-alive-'+Date.now()+'.png';
+    a.href=canvas.toDataURL('image/png');
+    a.click();
+    selectedObjectId=previous;
+    renderObjects();
+    toast('PNG exported successfully');
   });
 
   /* ================================================================
