@@ -230,8 +230,46 @@
   }
 
   .canvas-wrap{
-    position:relative; width:100%; max-width:680px; margin:0 auto 40px;
+    position:relative; width:100%; max-width:780px; margin:0 auto 40px;
   }
+
+  /* Canvas size choices */
+  .canvas-size-control{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .canvas-size-btn{
+    background:var(--bg-deep);border:1px solid var(--line);color:var(--ink-dim);
+    padding:7px 10px;border-radius:8px;cursor:pointer;font:inherit;font-size:12px;
+  }
+  .canvas-size-btn.active,.canvas-size-btn:hover{border-color:var(--teal);color:var(--teal);background:rgba(79,209,197,.10);}
+  .page-bar{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    background:var(--bg-panel);border:1px solid var(--line);border-radius:14px;
+    padding:10px 14px;margin-bottom:10px;
+  }
+  .page-label{font-size:11px;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.06em;}
+  .page-list{display:flex;gap:6px;flex-wrap:wrap;}
+  .page-btn{
+    min-width:34px;height:32px;padding:0 9px;border-radius:8px;
+    background:var(--bg-deep);border:1px solid var(--line);color:var(--ink-dim);
+    cursor:pointer;font:inherit;font-size:12px;
+  }
+  .page-btn.active{border-color:var(--yellow);color:var(--yellow);background:rgba(244,196,48,.10);}
+  .page-add,.page-delete{
+    background:var(--bg-deep);border:1px solid var(--line);color:var(--ink);
+    padding:7px 10px;border-radius:8px;cursor:pointer;font:inherit;font-size:12px;
+  }
+  .page-add:hover{border-color:var(--teal);color:var(--teal);}
+  .page-delete:hover{border-color:var(--coral);color:var(--coral);}
+  .page-count{font-size:11px;color:var(--ink-dim);margin-left:auto;}
+  .stage{cursor:pointer;}
+  .gopen,.gdownload{
+    border:1px solid var(--line);background:var(--bg-deep);color:var(--ink-dim);
+    border-radius:7px;padding:5px 8px;font:inherit;font-size:11px;cursor:pointer;
+  }
+  .gopen:hover{border-color:var(--teal);color:var(--teal);}
+  .gdownload:hover{border-color:var(--yellow);color:var(--yellow);}
+  .gallery-actions{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap;justify-content:center;}
+  .canvas-size-note{font-size:11px;color:var(--ink-dim);}
+
   .tape{
     position:absolute; width:70px; height:26px; background:rgba(237,234,223,0.55);
     box-shadow:0 2px 4px rgba(0,0,0,0.25); z-index:2;
@@ -580,8 +618,14 @@
       <button class="icon-btn" id="tool-eraser" title="Eraser">🧽 Eraser</button>
     </div>
     <div class="tool-group">
-      <span class="glabel">Size</span>
+      <span class="glabel">Brush</span>
       <input type="range" id="brush-size" min="2" max="26" value="6">
+    </div>
+    <div class="canvas-size-control" title="Choose how large the drawing area looks">
+      <span class="glabel">Canvas</span>
+      <button class="canvas-size-btn" data-size="small" type="button">Small</button>
+      <button class="canvas-size-btn active" data-size="medium" type="button">Medium</button>
+      <button class="canvas-size-btn" data-size="large" type="button">Large</button>
     </div>
     <div class="tool-group">
       <button class="icon-btn" id="undo-btn">↺ Undo</button>
@@ -593,79 +637,51 @@
     <span class="selection-help">Select → drag objects • corner handles → resize</span>
   </div>
 
+
+  <div class="page-bar">
+    <span class="page-label">Pages</span>
+    <div class="page-list" id="page-list"></div>
+    <button class="page-add" id="add-page-btn" type="button">＋ Add page</button>
+    <button class="page-delete" id="delete-page-btn" type="button">− Delete page</button>
+    <span class="page-count" id="page-count">Page 1 of 1</span>
+  </div>
+
   <div id="shape-row">
-    <span class="glabel">60+ SHAPES</span>
+    <span class="glabel">PRO SHAPES</span>
     <button class="shape-opt" data-shape="rect" title="Rectangle">▭</button>
     <button class="shape-opt" data-shape="roundRect" title="Rounded rectangle">▢</button>
     <button class="shape-opt" data-shape="circle" title="Circle">●</button>
     <button class="shape-opt" data-shape="ellipse" title="Ellipse">⬭</button>
     <button class="shape-opt" data-shape="triangle" title="Triangle">△</button>
-    <button class="shape-opt" data-shape="rightTriangle" title="Right triangle">◢</button>
     <button class="shape-opt" data-shape="diamond" title="Diamond">◆</button>
-    <button class="shape-opt" data-shape="kite" title="Kite">◇</button>
-    <button class="shape-opt" data-shape="parallelogram" title="Parallelogram">▱</button>
-    <button class="shape-opt" data-shape="trapezoid" title="Trapezoid">⏢</button>
     <button class="shape-opt" data-shape="pentagon" title="Pentagon">⬟</button>
     <button class="shape-opt" data-shape="hexagon" title="Hexagon">⬢</button>
-    <button class="shape-opt" data-shape="heptagon" title="Heptagon">⬣</button>
     <button class="shape-opt" data-shape="octagon" title="Octagon">🛑</button>
-    <button class="shape-opt" data-shape="nonagon" title="Nonagon">⬢</button>
-    <button class="shape-opt" data-shape="decagon" title="Decagon">⬣</button>
     <button class="shape-opt" data-shape="star" title="5-point star">★</button>
-    <button class="shape-opt" data-shape="star6" title="6-point star">✦</button>
-    <button class="shape-opt" data-shape="star8" title="8-point star">✹</button>
-    <button class="shape-opt" data-shape="burst" title="Burst star">✺</button>
     <button class="shape-opt" data-shape="heart" title="Heart">♥</button>
-    <button class="shape-opt" data-shape="heart2" title="Heart outline">♡</button>
     <button class="shape-opt" data-shape="arrow" title="Arrow">➜</button>
-    <button class="shape-opt" data-shape="doubleArrow" title="Double arrow">↔</button>
-    <button class="shape-opt" data-shape="leftArrow" title="Left arrow">←</button>
-    <button class="shape-opt" data-shape="upArrow" title="Up arrow">↑</button>
-    <button class="shape-opt" data-shape="downArrow" title="Down arrow">↓</button>
-    <button class="shape-opt" data-shape="chevron" title="Chevron">›</button>
-    <button class="shape-opt" data-shape="cross" title="Cross">✚</button>
-    <button class="shape-opt" data-shape="plus" title="Plus">＋</button>
-    <button class="shape-opt" data-shape="minus" title="Minus">−</button>
-    <button class="shape-opt" data-shape="xshape" title="X">×</button>
     <button class="shape-opt" data-shape="cloud" title="Cloud">☁</button>
     <button class="shape-opt" data-shape="speech" title="Speech bubble">💬</button>
-    <button class="shape-opt" data-shape="thought" title="Thought bubble">☁</button>
     <button class="shape-opt" data-shape="lightning" title="Lightning">⚡</button>
-    <button class="shape-opt" data-shape="moon" title="Moon">☾</button>
     <button class="shape-opt" data-shape="sun" title="Sun">☀</button>
-    <button class="shape-opt" data-shape="raindrop" title="Raindrop">💧</button>
-    <button class="shape-opt" data-shape="snowflake" title="Snowflake">❄</button>
     <button class="shape-opt" data-shape="leaf" title="Leaf">🍃</button>
-    <button class="shape-opt" data-shape="petal" title="Petal">❀</button>
     <button class="shape-opt" data-shape="flower" title="Flower">✿</button>
-    <button class="shape-opt" data-shape="fourFlower" title="Four-petal flower">✤</button>
     <button class="shape-opt" data-shape="pine" title="Pine tree">🌲</button>
-    <button class="shape-opt" data-shape="tree" title="Tree">🌳</button>
     <button class="shape-opt" data-shape="mountain" title="Mountain">⛰</button>
     <button class="shape-opt" data-shape="wave" title="Wave">〰</button>
-    <button class="shape-opt" data-shape="hill" title="Hill">⌒</button>
     <button class="shape-opt" data-shape="fish" title="Fish">🐟</button>
     <button class="shape-opt" data-shape="bird" title="Bird">🐦</button>
     <button class="shape-opt" data-shape="butterfly" title="Butterfly">🦋</button>
     <button class="shape-opt" data-shape="apple" title="Apple">🍎</button>
-    <button class="shape-opt" data-shape="lemon" title="Lemon">🍋</button>
-    <button class="shape-opt" data-shape="banana" title="Banana">🍌</button>
-    <button class="shape-opt" data-shape="mushroom" title="Mushroom">🍄</button>
     <button class="shape-opt" data-shape="egg" title="Egg">🥚</button>
     <button class="shape-opt" data-shape="balloon" title="Balloon">🎈</button>
-    <button class="shape-opt" data-shape="drop" title="Water drop">💧</button>
     <button class="shape-opt" data-shape="flame" title="Flame">🔥</button>
-    <button class="shape-opt" data-shape="key" title="Key">🔑</button>
-    <button class="shape-opt" data-shape="lock" title="Lock">🔒</button>
     <button class="shape-opt" data-shape="house" title="House">⌂</button>
-    <button class="shape-opt" data-shape="flag" title="Flag">⚑</button>
     <button class="shape-opt" data-shape="pin" title="Map pin">📍</button>
     <button class="shape-opt" data-shape="ring" title="Ring">○</button>
-    <button class="shape-opt" data-shape="semicircle" title="Semicircle">◓</button>
     <button class="shape-opt" data-shape="line" title="Line">╱</button>
     <button class="fill-toggle on" id="shape-fill-toggle" title="Toggle filled / outline">Filled</button>
   </div>
-
   <div id="palette-row">
     <span class="glabel">Color</span>
     <div id="color-dots"></div>
@@ -1181,6 +1197,14 @@ const googleProvider = new GoogleAuthProvider();
     av.style.background = profile.color;
     av.textContent = profile.name.trim()[0].toUpperCase();
 
+    if(!pages.length){
+      pages=[createBlankPage()];
+      currentPageIndex=0;
+      objects=[];
+      paperFill();
+      captureBase();
+    }
+    renderPageButtons();
     renderGallery();
   }
 
@@ -1212,6 +1236,136 @@ const googleProvider = new GoogleAuthProvider();
   let textInputEl = null;
   let textAnchor = null;
 
+  /* ---------------- Multi-page sketchbook ---------------- */
+  let pages = [];
+  let currentPageIndex = 0;
+  let pageLoading = false;
+
+  function createBlankPage(){
+    return { baseDataUrl:null, objects:[] };
+  }
+
+  function pageStateFromCanvas(){
+    return {
+      baseDataUrl: canvas.toDataURL('image/jpeg',0.82),
+      objects: cloneObjects()
+    };
+  }
+
+  function saveCurrentPageState(){
+    if(pageLoading) return;
+    pages[currentPageIndex] = pageStateFromCanvas();
+  }
+
+  function renderPageButtons(){
+    const list = $('page-list');
+    if(!list) return;
+    list.innerHTML = '';
+    pages.forEach((_,i)=>{
+      const b=document.createElement('button');
+      b.type='button';
+      b.className='page-btn' + (i===currentPageIndex?' active':'');
+      b.textContent=String(i+1);
+      b.title='Open page '+(i+1);
+      b.addEventListener('click',()=>loadPage(i));
+      list.appendChild(b);
+    });
+    $('page-count').textContent=`Page ${currentPageIndex+1} of ${pages.length}`;
+  }
+
+  function loadImageToCanvas(dataUrl){
+    return new Promise(resolve=>{
+      if(!dataUrl){
+        paperFill();
+        captureBase();
+        resolve();
+        return;
+      }
+      const img=new Image();
+      img.onload=()=>{
+        paperFill();
+        ctx.drawImage(img,0,0,canvas.width,canvas.height);
+        captureBase();
+        resolve();
+      };
+      img.onerror=()=>{
+        paperFill();
+        captureBase();
+        resolve();
+      };
+      img.src=dataUrl;
+    });
+  }
+
+  async function loadPage(index){
+    if(index<0 || index>=pages.length || pageLoading || index===currentPageIndex) return;
+    closeTextInput(true);
+    saveCurrentPageState();
+    pageLoading=true;
+    currentPageIndex=index;
+    selectedObjectId=null;
+    const state=pages[index] || createBlankPage();
+    pages[index]=state;
+    objects=JSON.parse(JSON.stringify(state.objects||[]));
+    await loadImageToCanvas(state.baseDataUrl);
+    pageLoading=false;
+    renderObjects();
+    renderPageButtons();
+  }
+
+  async function addPage(){
+    closeTextInput(true);
+    saveCurrentPageState();
+    pages.push(createBlankPage());
+    currentPageIndex=pages.length-1;
+    objects=[];
+    selectedObjectId=null;
+    undoStack=[];
+    paperFill();
+    captureBase();
+    renderObjects();
+    renderPageButtons();
+    toast('New page added');
+  }
+
+  async function deleteCurrentPage(){
+    if(pages.length===1){
+      toast('Keep at least one page');
+      return;
+    }
+    if(!confirm('Delete this page?')) return;
+    pages.splice(currentPageIndex,1);
+    currentPageIndex=Math.min(currentPageIndex,pages.length-1);
+    const state=pages[currentPageIndex] || createBlankPage();
+    objects=JSON.parse(JSON.stringify(state.objects||[]));
+    selectedObjectId=null;
+    undoStack=[];
+    await loadImageToCanvas(state.baseDataUrl);
+    renderObjects();
+    renderPageButtons();
+    toast('Page deleted');
+  }
+
+  $('add-page-btn').addEventListener('click',addPage);
+  $('delete-page-btn').addEventListener('click',deleteCurrentPage);
+
+  /* Users can choose a smaller or larger drawing board without changing
+     the saved image dimensions. This keeps gallery cards uniform. */
+  const CANVAS_DISPLAY_SIZES={small:520,medium:640,large:760};
+  function setCanvasDisplaySize(size){
+    const px=CANVAS_DISPLAY_SIZES[size]||640;
+    canvas.style.width=px+'px';
+    canvas.style.maxWidth='100%';
+    document.querySelectorAll('.canvas-size-btn').forEach(b=>{
+      b.classList.toggle('active',b.dataset.size===size);
+    });
+    localStorage.setItem('doodleCanvasSize',size);
+  }
+  document.querySelectorAll('.canvas-size-btn').forEach(b=>{
+    b.addEventListener('click',()=>setCanvasDisplaySize(b.dataset.size));
+  });
+  setCanvasDisplaySize(localStorage.getItem('doodleCanvasSize')||'medium');
+
   function paperFill(){
     ctx.fillStyle = '#FBF6EA';
     ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -1225,6 +1379,9 @@ const googleProvider = new GoogleAuthProvider();
 
   paperFill();
   let baseImage = ctx.getImageData(0,0,canvas.width,canvas.height);
+  pages = [createBlankPage()];
+  pages[0] = pageStateFromCanvas();
+  renderPageButtons();
 
   function cloneObjects(){
     return JSON.parse(JSON.stringify(objects));
@@ -1294,6 +1451,7 @@ const googleProvider = new GoogleAuthProvider();
 
   /* ---------------- Shape sub-toolbar ---------------- */
   const shapeOpts = [...document.querySelectorAll('.shape-opt')];
+  if(shapeOpts[0]) shapeOpts[0].classList.add('selected');
   shapeOpts.forEach(btn=>{
     btn.addEventListener('click', ()=>{
       shapeType = btn.dataset.shape;
@@ -1758,21 +1916,63 @@ const googleProvider = new GoogleAuthProvider();
     selectedObjectId = null;
     paperFill();
     captureBase();
+    saveCurrentPageState();
     renderObjects();
   });
 
-  $('export-btn').addEventListener('click', ()=>{
-    closeTextInput(true);
+  function compositeCurrentPageDataUrl(type='image/png',quality){
     const previous=selectedObjectId;
     selectedObjectId=null;
     renderObjects(false);
-    const a=document.createElement('a');
-    a.download='doodle-alive-'+Date.now()+'.png';
-    a.href=canvas.toDataURL('image/png');
-    a.click();
+    const url=canvas.toDataURL(type,quality);
     selectedObjectId=previous;
     renderObjects();
-    toast('PNG exported successfully');
+    return url;
+  }
+
+  async function downloadPageImage(index){
+    saveCurrentPageState();
+    const state=pages[index];
+    if(!state) return;
+
+    const savedCanvas=ctx.getImageData(0,0,canvas.width,canvas.height);
+    const savedBase=baseImage;
+    const savedObjects=objects;
+    const savedSelection=selectedObjectId;
+
+    await loadImageToCanvas(state.baseDataUrl);
+    baseImage=ctx.getImageData(0,0,canvas.width,canvas.height);
+    objects=JSON.parse(JSON.stringify(state.objects||[]));
+    selectedObjectId=null;
+    renderObjects(false);
+
+    const url=canvas.toDataURL('image/png');
+
+    ctx.putImageData(savedCanvas,0,0);
+    baseImage=savedBase;
+    objects=savedObjects;
+    selectedObjectId=savedSelection;
+    renderObjects();
+
+    const a=document.createElement('a');
+    a.download=`doodle-alive-page-${index+1}-${Date.now()}.png`;
+    a.href=url;
+    a.click();
+  }
+
+  $('export-btn').addEventListener('click',async ()=>{
+    closeTextInput(true);
+    saveCurrentPageState();
+    if(pages.length===1){
+      await downloadPageImage(0);
+      toast('PNG downloaded');
+    }else{
+      for(let i=0;i<pages.length;i++){
+        await downloadPageImage(i);
+        await new Promise(r=>setTimeout(r,180));
+      }
+      toast(`${pages.length} pages downloaded`);
+    }
   });
 
   /* ================================================================
@@ -1838,11 +2038,18 @@ const googleProvider = new GoogleAuthProvider();
       return;
     }
 
+    closeTextInput(true);
+    saveCurrentPageState();
+
     const title = $('doodle-title').value.trim() || 'Untitled doodle';
     const previousSelection = selectedObjectId;
     selectedObjectId = null;
     renderObjects(false);
-    const dataUrl = canvas.toDataURL('image/jpeg',0.88);
+
+    /* First page is the gallery thumbnail. It is always displayed in a
+       fixed card size, so a large/small drawing never changes the gallery UI. */
+    const dataUrl = canvas.toDataURL('image/jpeg',0.82);
+
     selectedObjectId = previousSelection;
     renderObjects();
 
@@ -1852,6 +2059,11 @@ const googleProvider = new GoogleAuthProvider();
       objectType: chosenObjectType,
       anim: chosenAnim,
       dataUrl,
+      pageCount: pages.length,
+      pages: pages.map(p=>({
+        baseDataUrl:p.baseDataUrl,
+        objects:JSON.parse(JSON.stringify(p.objects||[]))
+      })),
       createdAt: Date.now()
     };
 
@@ -1867,8 +2079,12 @@ const googleProvider = new GoogleAuthProvider();
 
     gallery.unshift(entry);
     $('modal-backdrop').style.display = 'none';
+
+    /* Return to the drawing page after Save & animate. */
+    $('app-screen').style.display = 'block';
+    $('canvas').scrollIntoView({behavior:'smooth',block:'center'});
     renderGallery();
-    toast('Saved to your living gallery ✨');
+    toast('Saved & animated — you can keep drawing ✨');
   });
 
   /* ================================================================
@@ -1884,6 +2100,71 @@ const googleProvider = new GoogleAuthProvider();
       '<img class="obj-inner ' + innerClass + '" src="' +
       item.dataUrl + '" alt="' + escapeHtml(item.title) + '">' +
       '</div>';
+  }
+
+  async function openGalleryItem(item){
+    const savedPages = item.pages && item.pages.length ? item.pages : [{
+      baseDataUrl:item.dataUrl || null,
+      objects:[]
+    }];
+
+    pages = savedPages.map(p=>({
+      baseDataUrl:p.baseDataUrl || null,
+      objects:JSON.parse(JSON.stringify(p.objects||[]))
+    }));
+    currentPageIndex=0;
+    selectedObjectId=null;
+    undoStack=[];
+
+    await loadImageToCanvas(pages[0].baseDataUrl);
+    baseImage=ctx.getImageData(0,0,canvas.width,canvas.height);
+    objects=JSON.parse(JSON.stringify(pages[0].objects||[]));
+    renderObjects();
+    renderPageButtons();
+
+    $('modal-backdrop').style.display='none';
+    $('app-screen').style.display='block';
+    $('canvas').scrollIntoView({behavior:'smooth',block:'center'});
+    setTool('select');
+    toast(`Opened "${item.title}"`);
+  }
+
+  async function downloadGalleryItem(item){
+    const savedPages = item.pages && item.pages.length ? item.pages : [{
+      baseDataUrl:item.dataUrl || null,
+      objects:[]
+    }];
+
+    /* Download every page as its own PNG. This works for any number of pages. */
+    const oldPages=pages;
+    const oldIndex=currentPageIndex;
+    const oldObjects=objects;
+    const oldBase=baseImage;
+    const oldSelection=selectedObjectId;
+
+    for(let i=0;i<savedPages.length;i++){
+      const p=savedPages[i];
+      await loadImageToCanvas(p.baseDataUrl);
+      baseImage=ctx.getImageData(0,0,canvas.width,canvas.height);
+      objects=JSON.parse(JSON.stringify(p.objects||[]));
+      selectedObjectId=null;
+      renderObjects(false);
+
+      const a=document.createElement('a');
+      a.download=`${(item.title||'doodle').replace(/[^a-z0-9_-]+/gi,'-')}-page-${i+1}.png`;
+      a.href=canvas.toDataURL('image/png');
+      a.click();
+      await new Promise(r=>setTimeout(r,180));
+    }
+
+    pages=oldPages;
+    currentPageIndex=oldIndex;
+    objects=oldObjects;
+    baseImage=oldBase;
+    selectedObjectId=oldSelection;
+    renderObjects();
+    renderPageButtons();
+    toast(`${savedPages.length} page${savedPages.length===1?'':'s'} downloaded`);
   }
 
   function renderGallery(){
@@ -1904,12 +2185,16 @@ const googleProvider = new GoogleAuthProvider();
       card.innerHTML =
         '<div class="pin"></div>' +
         '<button class="gdelete" title="Delete">✕</button>' +
-        '<div class="stage">' + stageInnerHTML(item) + '</div>' +
+        '<div class="stage" data-role="open" title="Open this doodle in the drawing page">' + stageInnerHTML(item) + '</div>' +
         '<div class="gname-row">' +
           '<span class="gname" data-role="gname">' + escapeHtml(item.title) + '</span>' +
           '<button class="edit-icon" title="Rename" data-role="edit">✎</button>' +
         '</div>' +
-        '<div class="gobjtype">' + (preset.label || 'Custom') + '</div>';
+        '<div class="gobjtype">' + (preset.label || 'Custom') + (item.pageCount > 1 ? ' · ' + item.pageCount + ' pages' : '') + '</div>' +
+        '<div class="gallery-actions">' +
+          '<button class="gopen" data-role="open">Open & edit</button>' +
+          '<button class="gdownload" data-role="download">Download</button>' +
+        '</div>';
 
       card.querySelector('.gdelete').addEventListener('click', async ()=>{
         const deleted = await deleteGalleryItem(item.id);
@@ -1922,6 +2207,14 @@ const googleProvider = new GoogleAuthProvider();
 
       card.querySelector('[data-role="edit"]').addEventListener('click', ()=>{
         startRename(card,item);
+      });
+
+      card.querySelectorAll('[data-role="open"]').forEach(el=>{
+        el.addEventListener('click',()=>openGalleryItem(item));
+      });
+
+      card.querySelector('[data-role="download"]').addEventListener('click',()=>{
+        downloadGalleryItem(item);
       });
 
       wrap.appendChild(card);
